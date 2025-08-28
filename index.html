@@ -5,16 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Ghausia Mosque Prayer Time</title>
 <style>
-  body { margin:0; font-family:sans-serif; background:#111; color:#eee; }
-  header { padding:1rem; background:#222; position:sticky; top:0; }
+  body { 
+    margin:0; 
+    font-family:sans-serif; 
+    background: #0f0 url('https://upload.wikimedia.org/wikipedia/commons/6/6e/Mosque_Sunset.jpg') no-repeat center center fixed;
+    background-size: cover;
+    color:#eee; 
+  }
+  header { padding:1rem; background:rgba(0,0,0,0.8); position:sticky; top:0; }
   h1 { margin:0; font-size:18px; }
   .tabs { margin-top:.5rem; display:flex; gap:.5rem; }
   .tab { background:#333; color:#eee; padding:.4rem .7rem; border-radius:5px; cursor:pointer; }
   .tab.active { background:#0f0; color:#000; font-weight:bold; }
   main { padding:1rem; }
-  .card { background:#222; padding:1rem; border-radius:8px; margin-bottom:1rem; }
-  input,button { padding:.5rem; border-radius:5px; border:none; }
-  input { background:#333; color:#eee; }
+  .card { background:rgba(0,0,0,0.8); padding:1rem; border-radius:8px; margin-bottom:1rem; }
+  input,button,textarea { padding:.5rem; border-radius:5px; border:none; }
+  input,textarea { background:#333; color:#eee; width:100%; }
   button { background:#0f0; color:#000; font-weight:bold; cursor:pointer; }
   button.secondary { background:#444; color:#eee; }
   table { width:100%; border-collapse:collapse; margin-top:.5rem; font-size:14px; }
@@ -22,6 +28,7 @@
   td[contenteditable="true"] { background:#333; }
   tr.today { background:#0f03; } /* highlight today */
   .hide { display:none; }
+  #hadithBox { background:#111; padding:1rem; margin:1rem; border-radius:8px; font-style:italic; }
 </style>
 </head>
 <body>
@@ -32,6 +39,12 @@
       <button class="tab" data-tab="admin">Admin</button>
     </div>
   </header>
+
+  <!-- HADITH OF THE MONTH -->
+  <section id="hadithBox" class="card">
+    <h3>Hadith of the Month</h3>
+    <div id="hadithText">No hadith set yet.</div>
+  </section>
 
   <main>
     <!-- PUBLIC TAB -->
@@ -51,6 +64,10 @@
       <div id="adminArea" class="hide">
         <input id="csvInput" type="file" accept=".csv" />
         <button id="saveBtn">Save Table</button>
+        <hr>
+        <h3>Edit Hadith of the Month</h3>
+        <textarea id="hadithInput" rows="3" placeholder="Type new hadith..."></textarea>
+        <button id="saveHadithBtn">Save Hadith</button>
       </div>
     </section>
   </main>
@@ -59,10 +76,15 @@
 /* ---------------- PASSWORD ---------------- */
 const PASSWORD = atob("MDc4NjA="); // "07860"
 
-/* ---------------- DATA ---------------- */
+/* ---------------- DATA KEYS ---------------- */
 const STORAGE_KEY = "prayerTimesTableCSV";
+const HADITH_KEY = "hadithOfTheDay";
+
 function saveData(rows){ localStorage.setItem(STORAGE_KEY, JSON.stringify(rows)); }
 function loadData(){ return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+
+function saveHadith(text){ localStorage.setItem(HADITH_KEY, text); }
+function loadHadith(){ return localStorage.getItem(HADITH_KEY) || "No hadith set yet."; }
 
 /* ---------------- RENDER ---------------- */
 function renderToday(rows){
@@ -86,6 +108,9 @@ function renderTable(rows){
   }).join("");
   document.getElementById("tableWrap").innerHTML = `<table>${thead}${tbody}</table>`;
   renderToday(rows);
+}
+function renderHadith(){
+  document.getElementById("hadithText").innerText = loadHadith();
 }
 
 /* ---------------- TABS ---------------- */
@@ -143,8 +168,19 @@ document.getElementById("saveBtn").onclick=()=>{
   alert("Saved!");
 };
 
+/* ---------------- SAVE HADITH ---------------- */
+document.getElementById("saveHadithBtn").onclick=()=>{
+  const newHadith=document.getElementById("hadithInput").value.trim();
+  if(newHadith){
+    saveHadith(newHadith);
+    renderHadith();
+    alert("Hadith saved!");
+  }
+};
+
 /* ---------------- INIT ---------------- */
 renderTable(loadData());
+renderHadith();
 </script>
 </body>
 </html>
