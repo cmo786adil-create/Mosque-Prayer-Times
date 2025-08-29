@@ -26,178 +26,155 @@
   table { width:100%; border-collapse:collapse; margin-top:.5rem; font-size:14px; }
   th,td { border:1px solid #444; padding:.3rem; text-align:center; }
   td[contenteditable="true"] { background:#333; }
-  tr.today { background:#0f03; } /* highlight today */
+  tr.today { background:#0f03; }
   .hide { display:none; }
   #hadithBox { background:#111; padding:1rem; margin:1rem; border-radius:8px; font-style:italic; }
 </style>
-
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
-
 </head>
 <body>
-<header>
-  <h1>Ghausia Mosque Prayer Time</h1>
-  <div class="tabs">
-    <button class="tab active" data-tab="public">Prayer Times</button>
-    <button class="tab" data-tab="admin">Admin</button>
-  </div>
-</header>
+  <header>
+    <h1>Ghausia Mosque Prayer Time</h1>
+    <div class="tabs">
+      <button class="tab active" data-tab="public">Prayer Times</button>
+      <button class="tab" data-tab="admin">Admin</button>
+    </div>
+  </header>
 
-<!-- HADITH OF THE MONTH -->
-<section id="hadithBox" class="card">
-  <h3>Hadith of the Month</h3>
-  <div id="hadithText">No hadith set yet.</div>
-</section>
-
-<main>
-  <!-- PUBLIC TAB -->
-  <section id="public" class="card">
-    <div id="todayBox"></div>
-    <div id="tableWrap"></div>
+  <!-- HADITH OF THE MONTH -->
+  <section id="hadithBox" class="card">
+    <h3>Hadith of the Month</h3>
+    <div id="hadithText">No hadith set yet.</div>
   </section>
 
-  <!-- ADMIN TAB -->
-  <section id="admin" class="card hide">
-    <div id="adminGate">
-      <input id="email" type="email" placeholder="Admin Email" />
-      <input id="pwd" type="password" placeholder="Password" />
-      <button id="loginBtn">Login</button>
-      <div id="loginMsg" style="color:red; display:none;">Wrong credentials or not authorized</div>
-    </div>
+  <main>
+    <!-- PUBLIC TAB -->
+    <section id="public" class="card">
+      <div id="todayBox"></div>
+      <div id="tableWrap"></div>
+    </section>
 
-    <div id="adminArea" class="hide">
-      <input id="csvInput" type="file" accept=".csv" />
-      <button id="saveBtn">Save Table</button>
-      <hr>
-      <h3>Edit Hadith of the Month</h3>
-      <textarea id="hadithInput" rows="3" placeholder="Type new hadith..."></textarea>
-      <button id="saveHadithBtn">Save Hadith</button>
-    </div>
-  </section>
-</main>
+    <!-- ADMIN TAB -->
+    <section id="admin" class="card hide">
+      <div id="adminGate">
+        <input id="pwd" type="password" placeholder="Enter password" />
+        <button id="loginBtn">Login</button>
+        <div id="loginMsg" style="color:red; display:none;">Wrong password</div>
+      </div>
 
-<script>
-// ---------------- FIREBASE CONFIG ----------------
-const firebaseConfig = {
-  apiKey: "AIzaSyDtrSvVSBZBASmn-f2SnqzWQDTpa9OSFA8",
-  authDomain: "ghausia-mosque.firebaseapp.com",
-  projectId: "ghausia-mosque",
-  storageBucket: "ghausia-mosque.firebasestorage.app",
-  messagingSenderId: "967127501442",
-  appId: "1:967127501442:web:31e3397f238bee9792c29b",
-  measurementId: "G-1207G9PLRJ"
-};
-const app = firebase.initializeApp(firebaseConfig);
-const analytics = firebase.analytics();
-const db = firebase.database();
-const auth = firebase.auth();
+      <div id="adminArea" class="hide">
+        <input id="csvInput" type="file" accept=".csv" />
+        <button id="saveBtn">Save Table</button>
+        <hr>
+        <h3>Edit Hadith of the Month</h3>
+        <textarea id="hadithInput" rows="3" placeholder="Type new hadith..."></textarea>
+        <button id="saveHadithBtn">Save Hadith</button>
+      </div>
+    </section>
+  </main>
 
-// Only this UID can access admin functions
-const ADMIN_UID = "zfdCu8n5thWBEPWyqkPbAixA3Ho2";
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
-// ---------------- DATA ----------------
-function saveData(rows){ db.ref("timetable").set(rows); }
-function loadData(callback){ db.ref("timetable").once("value").then(snap=>callback(snap.val()||[])); }
-function saveHadith(text){ db.ref("hadith").set(text); }
-function loadHadith(callback){ db.ref("hadith").once("value").then(snap=>callback(snap.val()||"No hadith set yet.")); }
+  <!-- Your custom script -->
+  <script>
+  /* ---------------- PASSWORD ---------------- */
+  const PASSWORD = atob("MDc4NjA="); // "07860"
 
-// ---------------- RENDER ----------------
-function renderToday(rows){
-  if(!rows.length){ document.getElementById("todayBox").innerHTML="No data yet."; return; }
-  const today = new Date().getDate();
-  let row = rows.find(r=>parseInt(r.Date)==today) || rows[rows.length-1];
-  let html = `<h3>Today's Times (Day ${row.Date})</h3>`;
-  for(let k in row){ if(k!=="Date") html += `<div><b>${k}:</b> ${row[k]}</div>`; }
-  document.getElementById("todayBox").innerHTML = html;
-}
-function renderTable(rows){
-  if(!rows.length){ document.getElementById("tableWrap").innerHTML=""; return; }
-  const headers = Object.keys(rows[0]||{});
-  let thead = `<tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr>`;
-  let tbody = rows.map(r=>{
-    const isToday = parseInt(r.Date) === new Date().getDate();
-    return `<tr class="${isToday?'today':''}">${headers.map(h=>`<td contenteditable="${h!=='Date'}">${r[h]}</td>`).join("")}</tr>`;
-  }).join("");
-  document.getElementById("tableWrap").innerHTML = `<table>${thead}${tbody}</table>`;
-  renderToday(rows);
-}
-function renderHadith(text){ document.getElementById("hadithText").innerText=text; }
+  /* ---------------- ADMIN UID ---------------- */
+  const ADMIN_UID = "zfdCu8n5thWBEPWyqkPbAixA3Ho2";
 
-// ---------------- TABS ----------------
-document.querySelectorAll(".tab").forEach(btn=>{
-  btn.onclick=()=>{
-    document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("public").classList.toggle("hide", btn.dataset.tab!=="public");
-    document.getElementById("admin").classList.toggle("hide", btn.dataset.tab!=="admin");
+  /* ---------------- FIREBASE CONFIG ---------------- */
+  const firebaseConfig = {
+    apiKey: "AIzaSyDtrSvVSBZBASmn-f2SnqzWQDTpa9OSFA8",
+    authDomain: "ghausia-mosque.firebaseapp.com",
+    databaseURL: "https://ghausia-mosque-default-rtdb.firebaseio.com",
+    projectId: "ghausia-mosque",
+    storageBucket: "ghausia-mosque.appspot.com",
+    messagingSenderId: "967127501442",
+    appId: "1:967127501442:web:31e3397f238bee9792c29b",
+    measurementId: "G-1207G9PLRJ"
   };
-});
+  firebase.initializeApp(firebaseConfig);
 
-// ---------------- AUTH ----------------
-document.getElementById("loginBtn").onclick=()=>{
-  const email=document.getElementById("email").value;
-  const pwd=document.getElementById("pwd").value;
-  auth.signInWithEmailAndPassword(email,pwd)
-    .then((cred)=>{
-      if(cred.user.uid === ADMIN_UID){
-        document.getElementById("adminGate").classList.add("hide");
-        document.getElementById("adminArea").classList.remove("hide");
-      } else {
-        auth.signOut();
-        document.getElementById("loginMsg").style.display="block";
-      }
-    })
-    .catch(()=>{ document.getElementById("loginMsg").style.display="block"; });
-};
+  /* ---------------- DATA KEYS ---------------- */
+  const db = firebase.database();
+  const timetableRef = db.ref("timetable");
+  const hadithRef = db.ref("hadith");
 
-// ---------------- CSV UPLOAD ----------------
-document.getElementById("csvInput").onchange=(e)=>{
-  const file=e.target.files[0];
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    const text=reader.result.trim();
-    const lines=text.split("\n").map(l=>l.split(","));
-    const headers=lines[0];
-    const rows=lines.slice(1).map(parts=>{
-      const obj={};
-      headers.forEach((h,i)=>obj[h.trim()]=parts[i]?parts[i].trim():"");
-      return obj;
-    });
-    saveData(rows);
-    renderTable(rows);
-  };
-  reader.readAsText(file);
-};
+  /* ---------------- RENDER ---------------- */
+  function renderTable(rows){
+    if(!rows.length){ document.getElementById("tableWrap").innerHTML=""; return; }
+    const headers = Object.keys(rows[0]);
+    const today = new Date().getDate();
+    let thead = `<tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr>`;
+    let tbody = rows.map(r=>{
+      const isToday = parseInt(r.Date) === today;
+      return `<tr class="${isToday ? 'today' : ''}">${headers.map(h=>`<td>${r[h]}</td>`).join("")}</tr>`;
+    }).join("");
+    document.getElementById("tableWrap").innerHTML = `<table>${thead}${tbody}</table>`;
+  }
 
-// ---------------- SAVE TABLE ----------------
-document.getElementById("saveBtn").onclick=()=>{
-  const rows=[];
-  const headers=[...document.querySelectorAll("#tableWrap th")].map(th=>th.textContent);
-  document.querySelectorAll("#tableWrap table tr").forEach((tr,i)=>{
-    if(i===0) return;
-    const cells=[...tr.children];
-    const row={};
-    cells.forEach((td,j)=>{ row[headers[j]]=td.textContent.trim(); });
-    rows.push(row);
+  function renderHadith(text){
+    document.getElementById("hadithText").innerText = text;
+  }
+
+  /* ---------------- TABS ---------------- */
+  document.querySelectorAll(".tab").forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("public").classList.toggle("hide", btn.dataset.tab!=="public");
+      document.getElementById("admin").classList.toggle("hide", btn.dataset.tab!=="admin");
+    };
   });
-  saveData(rows);
-  alert("Saved!");
-};
 
-// ---------------- SAVE HADITH ----------------
-document.getElementById("saveHadithBtn").onclick=()=>{
-  const newHadith=document.getElementById("hadithInput").value.trim();
-  if(newHadith){ saveHadith(newHadith); renderHadith(newHadith); alert("Hadith saved!"); }
-};
+  /* ---------------- LOGIN ---------------- */
+  document.getElementById("loginBtn").onclick=()=>{
+    if(document.getElementById("pwd").value===PASSWORD){
+      document.getElementById("adminGate").classList.add("hide");
+      document.getElementById("adminArea").classList.remove("hide");
+    } else {
+      document.getElementById("loginMsg").style.display="block";
+    }
+  };
 
-// ---------------- INIT ----------------
-loadData(renderTable);
-loadHadith(renderHadith);
-</script>
+  /* ---------------- SAVE TABLE ---------------- */
+  document.getElementById("saveBtn").onclick=()=>{
+    const rows = [];
+    const table = document.querySelector("#tableWrap table");
+    if(!table) return;
+    const headers = [...table.querySelectorAll("th")].map(th=>th.textContent);
+    table.querySelectorAll("tr").forEach((tr,i)=>{
+      if(i===0) return;
+      const row={};
+      [...tr.children].forEach((td,j)=>{ row[headers[j]]=td.textContent.trim(); });
+      rows.push(row);
+    });
+    timetableRef.set(rows).then(()=>alert("Saved!"));
+  };
+
+  /* ---------------- SAVE HADITH ---------------- */
+  document.getElementById("saveHadithBtn").onclick=()=>{
+    const text = document.getElementById("hadithInput").value.trim();
+    if(text){
+      hadithRef.set(text).then(()=>renderHadith(text));
+      alert("Hadith saved!");
+    }
+  };
+
+  /* ---------------- REALTIME LISTENERS ---------------- */
+  timetableRef.on("value", snapshot=>{
+    const val = snapshot.val() || [];
+    renderTable(val);
+  });
+
+  hadithRef.on("value", snapshot=>{
+    const val = snapshot.val() || "No hadith set yet.";
+    renderHadith(val);
+  });
+
+  </script>
 </body>
 </html>
