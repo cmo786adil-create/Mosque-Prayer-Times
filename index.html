@@ -8,20 +8,14 @@
   body { 
     margin:0; 
     font-family:sans-serif; 
-    background: #006400 url('https://upload.wikimedia.org/wikipedia/commons/6/6e/Mosque_Sunset.jpg') no-repeat center center fixed;
+    background: #0f0 url('https://upload.wikimedia.org/wikipedia/commons/6/6e/Mosque_Sunset.jpg') no-repeat center center fixed;
     background-size: cover;
     color:#eee; 
   }
-  header { 
-    padding:1rem; 
-    background:rgba(0,0,0,0.8); 
-    position:sticky; 
-    top:0; 
-    z-index:1000; 
-  }
+  header { padding:1rem; background:rgba(0,0,0,0.8); position:sticky; top:0; }
   h1 { margin:0; font-size:18px; }
   .tabs { margin-top:.5rem; display:flex; gap:.5rem; }
-  .tab { background:#333; color:#eee; padding:.4rem .7rem; border-radius:5px; cursor:pointer; pointer-events:auto; }
+  .tab { background:#333; color:#eee; padding:.4rem .7rem; border-radius:5px; cursor:pointer; }
   .tab.active { background:#0f0; color:#000; font-weight:bold; }
   main { padding:1rem; }
   .card { background:rgba(0,0,0,0.8); padding:1rem; border-radius:8px; margin-bottom:1rem; }
@@ -43,9 +37,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
 
-<!-- PapaParse for CSV -->
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
 </head>
 <body>
 <header>
@@ -56,17 +47,20 @@
   </div>
 </header>
 
+<!-- HADITH OF THE MONTH -->
 <section id="hadithBox" class="card">
   <h3>Hadith of the Month</h3>
   <div id="hadithText">No hadith set yet.</div>
 </section>
 
 <main>
+  <!-- PUBLIC TAB -->
   <section id="public" class="card">
     <div id="todayBox"></div>
     <div id="tableWrap"></div>
   </section>
 
+  <!-- ADMIN TAB -->
   <section id="admin" class="card hide">
     <div id="adminGate">
       <input id="email" type="email" placeholder="Admin Email" />
@@ -101,6 +95,8 @@ const app = firebase.initializeApp(firebaseConfig);
 const analytics = firebase.analytics();
 const db = firebase.database();
 const auth = firebase.auth();
+
+// Only this UID can access admin functions
 const ADMIN_UID = "zfdCu8n5thWBEPWyqkPbAixA3Ho2";
 
 // ---------------- DATA ----------------
@@ -132,21 +128,13 @@ function renderTable(rows){
 function renderHadith(text){ document.getElementById("hadithText").innerText=text; }
 
 // ---------------- TABS ----------------
-document.addEventListener("DOMContentLoaded", ()=>{
-  const tabs = document.querySelectorAll(".tab");
-  tabs.forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      tabs.forEach(b=>b.classList.remove("active"));
-      btn.classList.add("active");
-      if(btn.dataset.tab==="public"){
-        document.getElementById("public").classList.remove("hide");
-        document.getElementById("admin").classList.add("hide");
-      } else {
-        document.getElementById("public").classList.add("hide");
-        document.getElementById("admin").classList.remove("hide");
-      }
-    });
-  });
+document.querySelectorAll(".tab").forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("public").classList.toggle("hide", btn.dataset.tab!=="public");
+    document.getElementById("admin").classList.toggle("hide", btn.dataset.tab!=="admin");
+  };
 });
 
 // ---------------- AUTH ----------------
@@ -154,8 +142,8 @@ document.getElementById("loginBtn").onclick=()=>{
   const email=document.getElementById("email").value;
   const pwd=document.getElementById("pwd").value;
   auth.signInWithEmailAndPassword(email,pwd)
-    .then(cred=>{
-      if(cred.user.uid===ADMIN_UID){
+    .then((cred)=>{
+      if(cred.user.uid === ADMIN_UID){
         document.getElementById("adminGate").classList.add("hide");
         document.getElementById("adminArea").classList.remove("hide");
       } else {
@@ -170,23 +158,20 @@ document.getElementById("loginBtn").onclick=()=>{
 document.getElementById("csvInput").onchange=(e)=>{
   const file=e.target.files[0];
   if(!file) return;
-
-  Papa.parse(file,{
-    header:true,
-    skipEmptyLines:true,
-    trimHeaders:true,
-    complete: function(results){
-      const rows = results.data.map(row=>{
-        const cleanRow={};
-        for(let k in row) cleanRow[k.trim()]=row[k].trim();
-        return cleanRow;
-      });
-      saveData(rows);
-      renderTable(rows);
-      alert("CSV uploaded successfully!");
-    },
-    error: function(err){ alert("Error parsing CSV: "+err.message); }
-  });
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const text=reader.result.trim();
+    const lines=text.split("\n").map(l=>l.split(","));
+    const headers=lines[0];
+    const rows=lines.slice(1).map(parts=>{
+      const obj={};
+      headers.forEach((h,i)=>obj[h.trim()]=parts[i]?parts[i].trim():"");
+      return obj;
+    });
+    saveData(rows);
+    renderTable(rows);
+  };
+  reader.readAsText(file);
 };
 
 // ---------------- SAVE TABLE ----------------
