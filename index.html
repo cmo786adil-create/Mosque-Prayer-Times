@@ -4,8 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Ghausia Mosque Prayer Time</title>
-
-<!-- Styles -->
 <style>
   body { 
     margin:0; 
@@ -24,10 +22,11 @@
   input,button,textarea { padding:.5rem; border-radius:5px; border:none; }
   input,textarea { background:#333; color:#eee; width:100%; }
   button { background:#0f0; color:#000; font-weight:bold; cursor:pointer; }
+  button.secondary { background:#444; color:#eee; }
   table { width:100%; border-collapse:collapse; margin-top:.5rem; font-size:14px; }
   th,td { border:1px solid #444; padding:.3rem; text-align:center; }
   td[contenteditable="true"] { background:#333; }
-  tr.today { background:#0f03; }
+  tr.today { background:#0f03; } /* highlight today */
   .hide { display:none; }
   #hadithBox { background:#111; padding:1rem; margin:1rem; border-radius:8px; font-style:italic; }
 </style>
@@ -35,10 +34,11 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
+
 </head>
 <body>
-
 <header>
   <h1>Ghausia Mosque Prayer Time</h1>
   <div class="tabs">
@@ -47,25 +47,26 @@
   </div>
 </header>
 
-<!-- Hadith of the Month -->
+<!-- HADITH OF THE MONTH -->
 <section id="hadithBox" class="card">
   <h3>Hadith of the Month</h3>
   <div id="hadithText">No hadith set yet.</div>
 </section>
 
 <main>
-  <!-- Public Tab -->
+  <!-- PUBLIC TAB -->
   <section id="public" class="card">
     <div id="todayBox"></div>
     <div id="tableWrap"></div>
   </section>
 
-  <!-- Admin Tab -->
+  <!-- ADMIN TAB -->
   <section id="admin" class="card hide">
     <div id="adminGate">
-      <input id="pwd" type="password" placeholder="Enter password" />
+      <input id="email" type="email" placeholder="Admin Email" />
+      <input id="pwd" type="password" placeholder="Password" />
       <button id="loginBtn">Login</button>
-      <div id="loginMsg" style="color:red; display:none;">Wrong password</div>
+      <div id="loginMsg" style="color:red; display:none;">Wrong credentials or not authorized</div>
     </div>
 
     <div id="adminArea" class="hide">
@@ -80,9 +81,6 @@
 </main>
 
 <script>
-// ---------------- PASSWORD ----------------
-const PASSWORD = atob("MDc4NjA="); // "07860"
-
 // ---------------- FIREBASE CONFIG ----------------
 const firebaseConfig = {
   apiKey: "AIzaSyDtrSvVSBZBASmn-f2SnqzWQDTpa9OSFA8",
@@ -93,26 +91,19 @@ const firebaseConfig = {
   appId: "1:967127501442:web:31e3397f238bee9792c29b",
   measurementId: "G-1207G9PLRJ"
 };
-
-// Initialize Firebase
 const app = firebase.initializeApp(firebaseConfig);
 const analytics = firebase.analytics();
 const db = firebase.database();
+const auth = firebase.auth();
 
-// ---------------- DATA FUNCTIONS ----------------
+// Only this UID can access admin functions
+const ADMIN_UID = "zfdCu8n5thWBEPWyqkPbAixA3Ho2";
+
+// ---------------- DATA ----------------
 function saveData(rows){ db.ref("timetable").set(rows); }
-function loadData(callback){
-  db.ref("timetable").once("value").then(snapshot => {
-    callback(snapshot.val() || []);
-  });
-}
-
+function loadData(callback){ db.ref("timetable").once("value").then(snap=>callback(snap.val()||[])); }
 function saveHadith(text){ db.ref("hadith").set(text); }
-function loadHadith(callback){
-  db.ref("hadith").once("value").then(snapshot => {
-    callback(snapshot.val() || "No hadith set yet.");
-  });
-}
+function loadHadith(callback){ db.ref("hadith").once("value").then(snap=>callback(snap.val()||"No hadith set yet.")); }
 
 // ---------------- RENDER ----------------
 function renderToday(rows){
@@ -120,28 +111,21 @@ function renderToday(rows){
   const today = new Date().getDate();
   let row = rows.find(r=>parseInt(r.Date)==today) || rows[rows.length-1];
   let html = `<h3>Today's Times (Day ${row.Date})</h3>`;
-  for(let k in row){ 
-    if(k!=="Date") html += `<div><b>${k}:</b> ${row[k]}</div>`; 
-  }
+  for(let k in row){ if(k!=="Date") html += `<div><b>${k}:</b> ${row[k]}</div>`; }
   document.getElementById("todayBox").innerHTML = html;
 }
-
 function renderTable(rows){
   if(!rows.length){ document.getElementById("tableWrap").innerHTML=""; return; }
-  const headers = Object.keys(rows[0]);
-  const today = new Date().getDate();
+  const headers = Object.keys(rows[0]||{});
   let thead = `<tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr>`;
   let tbody = rows.map(r=>{
-    const isToday = parseInt(r.Date) === today;
-    return `<tr class="${isToday ? 'today' : ''}">${headers.map(h=>`<td contenteditable="${h!=='Date'}">${r[h]}</td>`).join("")}</tr>`;
+    const isToday = parseInt(r.Date) === new Date().getDate();
+    return `<tr class="${isToday?'today':''}">${headers.map(h=>`<td contenteditable="${h!=='Date'}">${r[h]}</td>`).join("")}</tr>`;
   }).join("");
   document.getElementById("tableWrap").innerHTML = `<table>${thead}${tbody}</table>`;
   renderToday(rows);
 }
-
-function renderHadith(){
-  loadHadith(text => document.getElementById("hadithText").innerText = text);
-}
+function renderHadith(text){ document.getElementById("hadithText").innerText=text; }
 
 // ---------------- TABS ----------------
 document.querySelectorAll(".tab").forEach(btn=>{
@@ -153,14 +137,21 @@ document.querySelectorAll(".tab").forEach(btn=>{
   };
 });
 
-// ---------------- LOGIN ----------------
+// ---------------- AUTH ----------------
 document.getElementById("loginBtn").onclick=()=>{
-  if(document.getElementById("pwd").value===PASSWORD){
-    document.getElementById("adminGate").classList.add("hide");
-    document.getElementById("adminArea").classList.remove("hide");
-  } else {
-    document.getElementById("loginMsg").style.display="block";
-  }
+  const email=document.getElementById("email").value;
+  const pwd=document.getElementById("pwd").value;
+  auth.signInWithEmailAndPassword(email,pwd)
+    .then((cred)=>{
+      if(cred.user.uid === ADMIN_UID){
+        document.getElementById("adminGate").classList.add("hide");
+        document.getElementById("adminArea").classList.remove("hide");
+      } else {
+        auth.signOut();
+        document.getElementById("loginMsg").style.display="block";
+      }
+    })
+    .catch(()=>{ document.getElementById("loginMsg").style.display="block"; });
 };
 
 // ---------------- CSV UPLOAD ----------------
@@ -201,17 +192,12 @@ document.getElementById("saveBtn").onclick=()=>{
 // ---------------- SAVE HADITH ----------------
 document.getElementById("saveHadithBtn").onclick=()=>{
   const newHadith=document.getElementById("hadithInput").value.trim();
-  if(newHadith){
-    saveHadith(newHadith);
-    renderHadith();
-    alert("Hadith saved!");
-  }
+  if(newHadith){ saveHadith(newHadith); renderHadith(newHadith); alert("Hadith saved!"); }
 };
 
 // ---------------- INIT ----------------
 loadData(renderTable);
-renderHadith();
+loadHadith(renderHadith);
 </script>
-
 </body>
 </html>
