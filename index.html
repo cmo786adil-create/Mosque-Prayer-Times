@@ -26,7 +26,7 @@
   table { width:100%; border-collapse:collapse; margin-top:.5rem; font-size:14px; }
   th,td { border:1px solid #444; padding:.3rem; text-align:center; }
   td[contenteditable="true"] { background:#333; }
-  tr.today { background:#0f03; } /* highlight today */
+  tr.today { background:#0f03; }
   .hide { display:none; }
   #hadithBox { background:#111; padding:1rem; margin:1rem; border-radius:8px; font-style:italic; }
 </style>
@@ -36,6 +36,9 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
+
+<!-- PapaParse for robust CSV parsing -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 </head>
 <body>
@@ -47,20 +50,17 @@
   </div>
 </header>
 
-<!-- HADITH OF THE MONTH -->
 <section id="hadithBox" class="card">
   <h3>Hadith of the Month</h3>
   <div id="hadithText">No hadith set yet.</div>
 </section>
 
 <main>
-  <!-- PUBLIC TAB -->
   <section id="public" class="card">
     <div id="todayBox"></div>
     <div id="tableWrap"></div>
   </section>
 
-  <!-- ADMIN TAB -->
   <section id="admin" class="card hide">
     <div id="adminGate">
       <input id="email" type="email" placeholder="Admin Email" />
@@ -128,13 +128,20 @@ function renderTable(rows){
 function renderHadith(text){ document.getElementById("hadithText").innerText=text; }
 
 // ---------------- TABS ----------------
+const publicTab = document.getElementById("public");
+const adminTab = document.getElementById("admin");
 document.querySelectorAll(".tab").forEach(btn=>{
-  btn.onclick=()=>{
+  btn.addEventListener("click", ()=>{
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-    document.getElementById("public").classList.toggle("hide", btn.dataset.tab!=="public");
-    document.getElementById("admin").classList.toggle("hide", btn.dataset.tab!=="admin");
-  };
+    if(btn.dataset.tab==="public"){
+      publicTab.classList.remove("hide");
+      adminTab.classList.add("hide");
+    } else {
+      publicTab.classList.add("hide");
+      adminTab.classList.remove("hide");
+    }
+  });
 });
 
 // ---------------- AUTH ----------------
@@ -142,7 +149,7 @@ document.getElementById("loginBtn").onclick=()=>{
   const email=document.getElementById("email").value;
   const pwd=document.getElementById("pwd").value;
   auth.signInWithEmailAndPassword(email,pwd)
-    .then((cred)=>{
+    .then(cred=>{
       if(cred.user.uid === ADMIN_UID){
         document.getElementById("adminGate").classList.add("hide");
         document.getElementById("adminArea").classList.remove("hide");
@@ -158,20 +165,20 @@ document.getElementById("loginBtn").onclick=()=>{
 document.getElementById("csvInput").onchange=(e)=>{
   const file=e.target.files[0];
   if(!file) return;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    const text=reader.result.trim();
-    const lines=text.split("\n").map(l=>l.split(","));
-    const headers=lines[0];
-    const rows=lines.slice(1).map(parts=>{
-      const obj={};
-      headers.forEach((h,i)=>obj[h.trim()]=parts[i]?parts[i].trim():"");
-      return obj;
-    });
-    saveData(rows);
-    renderTable(rows);
-  };
-  reader.readAsText(file);
+
+  Papa.parse(file, {
+    header:true,
+    skipEmptyLines:true,
+    complete:function(results){
+      const rows = results.data;
+      saveData(rows);
+      renderTable(rows);
+      alert("CSV uploaded successfully!");
+    },
+    error:function(err){
+      alert("Error parsing CSV: " + err.message);
+    }
+  });
 };
 
 // ---------------- SAVE TABLE ----------------
