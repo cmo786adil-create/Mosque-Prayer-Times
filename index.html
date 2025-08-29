@@ -4,6 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Ghausia Mosque Prayer Time</title>
+
+<!-- Styles -->
 <style>
   body { 
     margin:0; 
@@ -22,71 +24,97 @@
   input,button,textarea { padding:.5rem; border-radius:5px; border:none; }
   input,textarea { background:#333; color:#eee; width:100%; }
   button { background:#0f0; color:#000; font-weight:bold; cursor:pointer; }
-  button.secondary { background:#444; color:#eee; }
   table { width:100%; border-collapse:collapse; margin-top:.5rem; font-size:14px; }
   th,td { border:1px solid #444; padding:.3rem; text-align:center; }
   td[contenteditable="true"] { background:#333; }
-  tr.today { background:#0f03; } /* highlight today */
+  tr.today { background:#0f03; }
   .hide { display:none; }
   #hadithBox { background:#111; padding:1rem; margin:1rem; border-radius:8px; font-style:italic; }
 </style>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
 </head>
 <body>
-  <header>
-    <h1>Ghausia Mosque Prayer Time</h1>
-    <div class="tabs">
-      <button class="tab active" data-tab="public">Prayer Times</button>
-      <button class="tab" data-tab="admin">Admin</button>
-    </div>
-  </header>
 
-  <!-- HADITH OF THE MONTH -->
-  <section id="hadithBox" class="card">
-    <h3>Hadith of the Month</h3>
-    <div id="hadithText">No hadith set yet.</div>
+<header>
+  <h1>Ghausia Mosque Prayer Time</h1>
+  <div class="tabs">
+    <button class="tab active" data-tab="public">Prayer Times</button>
+    <button class="tab" data-tab="admin">Admin</button>
+  </div>
+</header>
+
+<!-- Hadith of the Month -->
+<section id="hadithBox" class="card">
+  <h3>Hadith of the Month</h3>
+  <div id="hadithText">No hadith set yet.</div>
+</section>
+
+<main>
+  <!-- Public Tab -->
+  <section id="public" class="card">
+    <div id="todayBox"></div>
+    <div id="tableWrap"></div>
   </section>
 
-  <main>
-    <!-- PUBLIC TAB -->
-    <section id="public" class="card">
-      <div id="todayBox"></div>
-      <div id="tableWrap"></div>
-    </section>
+  <!-- Admin Tab -->
+  <section id="admin" class="card hide">
+    <div id="adminGate">
+      <input id="pwd" type="password" placeholder="Enter password" />
+      <button id="loginBtn">Login</button>
+      <div id="loginMsg" style="color:red; display:none;">Wrong password</div>
+    </div>
 
-    <!-- ADMIN TAB -->
-    <section id="admin" class="card hide">
-      <div id="adminGate">
-        <input id="pwd" type="password" placeholder="Enter password" />
-        <button id="loginBtn">Login</button>
-        <div id="loginMsg" style="color:red; display:none;">Wrong password</div>
-      </div>
-
-      <div id="adminArea" class="hide">
-        <input id="csvInput" type="file" accept=".csv" />
-        <button id="saveBtn">Save Table</button>
-        <hr>
-        <h3>Edit Hadith of the Month</h3>
-        <textarea id="hadithInput" rows="3" placeholder="Type new hadith..."></textarea>
-        <button id="saveHadithBtn">Save Hadith</button>
-      </div>
-    </section>
-  </main>
+    <div id="adminArea" class="hide">
+      <input id="csvInput" type="file" accept=".csv" />
+      <button id="saveBtn">Save Table</button>
+      <hr>
+      <h3>Edit Hadith of the Month</h3>
+      <textarea id="hadithInput" rows="3" placeholder="Type new hadith..."></textarea>
+      <button id="saveHadithBtn">Save Hadith</button>
+    </div>
+  </section>
+</main>
 
 <script>
-/* ---------------- PASSWORD ---------------- */
+// ---------------- PASSWORD ----------------
 const PASSWORD = atob("MDc4NjA="); // "07860"
 
-/* ---------------- DATA KEYS ---------------- */
-const STORAGE_KEY = "prayerTimesTableCSV";
-const HADITH_KEY = "hadithOfTheDay";
+// ---------------- FIREBASE CONFIG ----------------
+const firebaseConfig = {
+  apiKey: "AIzaSyDtrSvVSBZBASmn-f2SnqzWQDTpa9OSFA8",
+  authDomain: "ghausia-mosque.firebaseapp.com",
+  projectId: "ghausia-mosque",
+  storageBucket: "ghausia-mosque.firebasestorage.app",
+  messagingSenderId: "967127501442",
+  appId: "1:967127501442:web:31e3397f238bee9792c29b",
+  measurementId: "G-1207G9PLRJ"
+};
 
-function saveData(rows){ localStorage.setItem(STORAGE_KEY, JSON.stringify(rows)); }
-function loadData(){ return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+// Initialize Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const analytics = firebase.analytics();
+const db = firebase.database();
 
-function saveHadith(text){ localStorage.setItem(HADITH_KEY, text); }
-function loadHadith(){ return localStorage.getItem(HADITH_KEY) || "No hadith set yet."; }
+// ---------------- DATA FUNCTIONS ----------------
+function saveData(rows){ db.ref("timetable").set(rows); }
+function loadData(callback){
+  db.ref("timetable").once("value").then(snapshot => {
+    callback(snapshot.val() || []);
+  });
+}
 
-/* ---------------- RENDER ---------------- */
+function saveHadith(text){ db.ref("hadith").set(text); }
+function loadHadith(callback){
+  db.ref("hadith").once("value").then(snapshot => {
+    callback(snapshot.val() || "No hadith set yet.");
+  });
+}
+
+// ---------------- RENDER ----------------
 function renderToday(rows){
   if(!rows.length){ document.getElementById("todayBox").innerHTML="No data yet."; return; }
   const today = new Date().getDate();
@@ -97,6 +125,7 @@ function renderToday(rows){
   }
   document.getElementById("todayBox").innerHTML = html;
 }
+
 function renderTable(rows){
   if(!rows.length){ document.getElementById("tableWrap").innerHTML=""; return; }
   const headers = Object.keys(rows[0]);
@@ -109,11 +138,12 @@ function renderTable(rows){
   document.getElementById("tableWrap").innerHTML = `<table>${thead}${tbody}</table>`;
   renderToday(rows);
 }
+
 function renderHadith(){
-  document.getElementById("hadithText").innerText = loadHadith();
+  loadHadith(text => document.getElementById("hadithText").innerText = text);
 }
 
-/* ---------------- TABS ---------------- */
+// ---------------- TABS ----------------
 document.querySelectorAll(".tab").forEach(btn=>{
   btn.onclick=()=>{
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
@@ -123,7 +153,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
   };
 });
 
-/* ---------------- LOGIN ---------------- */
+// ---------------- LOGIN ----------------
 document.getElementById("loginBtn").onclick=()=>{
   if(document.getElementById("pwd").value===PASSWORD){
     document.getElementById("adminGate").classList.add("hide");
@@ -133,7 +163,7 @@ document.getElementById("loginBtn").onclick=()=>{
   }
 };
 
-/* ---------------- CSV UPLOAD ---------------- */
+// ---------------- CSV UPLOAD ----------------
 document.getElementById("csvInput").onchange=(e)=>{
   const file=e.target.files[0];
   if(!file) return;
@@ -153,12 +183,12 @@ document.getElementById("csvInput").onchange=(e)=>{
   reader.readAsText(file);
 };
 
-/* ---------------- SAVE TABLE ---------------- */
+// ---------------- SAVE TABLE ----------------
 document.getElementById("saveBtn").onclick=()=>{
   const rows=[];
   const headers=[...document.querySelectorAll("#tableWrap th")].map(th=>th.textContent);
   document.querySelectorAll("#tableWrap table tr").forEach((tr,i)=>{
-    if(i===0) return; // skip header
+    if(i===0) return;
     const cells=[...tr.children];
     const row={};
     cells.forEach((td,j)=>{ row[headers[j]]=td.textContent.trim(); });
@@ -168,7 +198,7 @@ document.getElementById("saveBtn").onclick=()=>{
   alert("Saved!");
 };
 
-/* ---------------- SAVE HADITH ---------------- */
+// ---------------- SAVE HADITH ----------------
 document.getElementById("saveHadithBtn").onclick=()=>{
   const newHadith=document.getElementById("hadithInput").value.trim();
   if(newHadith){
@@ -178,9 +208,10 @@ document.getElementById("saveHadithBtn").onclick=()=>{
   }
 };
 
-/* ---------------- INIT ---------------- */
-renderTable(loadData());
+// ---------------- INIT ----------------
+loadData(renderTable);
 renderHadith();
 </script>
+
 </body>
 </html>
