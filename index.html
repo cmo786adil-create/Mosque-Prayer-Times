@@ -8,7 +8,7 @@
   body { 
     margin:0; 
     font-family:sans-serif; 
-    background: #0f0 url('https://upload.wikimedia.org/wikipedia/commons/6/6e/Mosque_Sunset.jpg') no-repeat center center fixed;
+    background: #006400 url('https://upload.wikimedia.org/wikipedia/commons/6/6e/Mosque_Sunset.jpg') no-repeat center center fixed;
     background-size: cover;
     color:#eee; 
   }
@@ -26,7 +26,7 @@
   table { width:100%; border-collapse:collapse; margin-top:.5rem; font-size:14px; }
   th,td { border:1px solid #444; padding:.3rem; text-align:center; }
   td[contenteditable="true"] { background:#333; }
-  tr.today { background:#0f03; }
+  tr.today { background:#0f03; } /* highlight today */
   .hide { display:none; }
   #hadithBox { background:#111; padding:1rem; margin:1rem; border-radius:8px; font-style:italic; }
 </style>
@@ -162,20 +162,25 @@ document.getElementById("loginBtn").onclick=()=>{
 };
 
 // ---------------- CSV UPLOAD ----------------
-document.getElementById("csvInput").onchange=(e)=>{
-  const file=e.target.files[0];
-  if(!file) return;
+document.getElementById("csvInput").onchange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
   Papa.parse(file, {
-    header:true,
-    skipEmptyLines:true,
-    complete:function(results){
-      const rows = results.data;
+    header: true,
+    skipEmptyLines: true,
+    trimHeaders: true,
+    complete: function(results) {
+      const rows = results.data.map(row=>{
+        const cleanRow = {};
+        for(let k in row){ cleanRow[k.trim()] = row[k].trim(); }
+        return cleanRow;
+      });
       saveData(rows);
       renderTable(rows);
       alert("CSV uploaded successfully!");
     },
-    error:function(err){
+    error: function(err){
       alert("Error parsing CSV: " + err.message);
     }
   });
@@ -199,12 +204,4 @@ document.getElementById("saveBtn").onclick=()=>{
 // ---------------- SAVE HADITH ----------------
 document.getElementById("saveHadithBtn").onclick=()=>{
   const newHadith=document.getElementById("hadithInput").value.trim();
-  if(newHadith){ saveHadith(newHadith); renderHadith(newHadith); alert("Hadith saved!"); }
-};
-
-// ---------------- INIT ----------------
-loadData(renderTable);
-loadHadith(renderHadith);
-</script>
-</body>
-</html>
+  if(newHadith){ saveHadith
